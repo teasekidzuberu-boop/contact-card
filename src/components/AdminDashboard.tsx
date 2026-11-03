@@ -24,6 +24,9 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { SOCIAL_PLATFORMS, isValidExternalUrl } from "@/lib/social";
 import type { SocialLink } from "@/lib/types";
+import ContactCard from "@/components/ContactCard";
+import { DEFAULT_BRAND_COLOR, isHexColor } from "@/lib/brand";
+import { normalizePhone } from "@/lib/phone";
 
 const AVATAR_PATH = "avatar";
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -41,6 +44,8 @@ interface ProfileForm {
   location: string;
   website: string;
   published: boolean;
+  brand_color: string;
+  qr_url: string;
 }
 
 interface LinkRow extends SocialLink {
@@ -60,6 +65,8 @@ const EMPTY_FORM: ProfileForm = {
   location: "",
   website: "",
   published: true,
+  brand_color: DEFAULT_BRAND_COLOR,
+  qr_url: "",
 };
 
 let linkKeyCounter = 0;
@@ -79,6 +86,13 @@ export default function AdminDashboard() {
   const [avatarVersion, setAvatarVersion] = useState(0);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photoFile) return setPhotoPreview(null);
+    const u = URL.createObjectURL(photoFile);
+    setPhotoPreview(u);
+    return () => URL.revokeObjectURL(u);
+  }, [photoFile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +138,8 @@ export default function AdminDashboard() {
         location: row.location,
         website: row.website,
         published: row.published,
+        brand_color: row.brand_color,
+        qr_url: row.qr_url,
       });
       setAvatarPath(row.avatar_path);
 
@@ -189,6 +205,30 @@ export default function AdminDashboard() {
       toast.error("Slug may only contain lowercase letters, numbers and dashes");
       return;
     }
+    if (form.phone.trim() && !normalizePhone(form.phone)) {
+      toast.error("Phone number looks invalid — use international format, e.g. +234 801 234 5678");
+      return;
+    }
+    if (form.whatsapp_number.trim() && !normalizePhone(form.whatsapp_number)) {
+      toast.error("WhatsApp number looks invalid — include the country code");
+      return;
+    }
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.error("Email address looks invalid");
+      return;
+    }
+    if (form.website.trim() && !isValidExternalUrl(form.website)) {
+      toast.error("Website must start with http:// or https://");
+      return;
+    }
+    if (form.qr_url.trim() && !isValidExternalUrl(form.qr_url)) {
+      toast.error("QR destination must start with http:// or https://");
+      return;
+    }
+    if (!isHexColor(form.brand_color)) {
+      toast.error("Brand color must be a hex value like #D7B56D");
+      return;
+    }
     const filledLinks = links.filter((l) => l.url.trim() !== "");
     const invalid = filledLinks.find((l) => !isValidExternalUrl(l.url));
     if (invalid) {
@@ -225,6 +265,8 @@ export default function AdminDashboard() {
           location: form.location.trim(),
           website: form.website.trim(),
           published: form.published,
+          brand_color: form.brand_color.trim(),
+          qr_url: form.qr_url.trim(),
           avatar_path: nextAvatarPath,
         })
         .eq("id", profileId);
@@ -292,8 +334,8 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <h1 className="font-display text-xl text-foreground">Contact card admin</h1>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
+          <h1 className="truncate font-display text-lg font-semibold text-foreground">Luxe<span className="text-primary">Card</span> admin</h1>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm">
               <Link to="/p/$slug" params={{ slug: form.slug }} target="_blank" rel="noopener noreferrer">
@@ -307,7 +349,8 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-6 px-4 py-6 pb-28">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 pb-28 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <main className="min-w-0 space-y-6">
         {!form.published && (
           <div
             role="status"
@@ -489,6 +532,33 @@ export default function AdminDashboard() {
           )}
         </section>
 
+        {/* Branding & QR */}
+        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="brand-heading">
+          <h2 id="brand-heading" className="mb-4 text-sm font-semibold uppercase tracking-widest text-primary">
+            Brand &amp; QR code
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="brand_color">Accent color</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  aria-label="Pick accent color"
+                  value={isHexColor(form.brand_color) && form.brand_color.length === 7 ? form.brand_color : DEFAULT_BRAND_COLOR}
+                  onChange={(e) => set("brand_color", e.target.value.toUpperCase())}
+                  className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-input bg-transparent"
+                />
+                <Input id="brand_color" value={form.brand_color} onChange={(e) => set("brand_color", e.target.value)} className={field} aria-invalid={!isHexColor(form.brand_color)} />
+                <Button type="button" variant="ghost" size="sm" onClick={() => set("brand_color", DEFAULT_BRAND_COLOR)}>Reset</Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="qr_url">QR code destination</Label>
+              <Input id="qr_url" type="url" value={form.qr_url} onChange={(e) => set("qr_url", e.target.value)} className={field} placeholder="Leave empty to use your card link" />
+            </div>
+          </div>
+        </section>
+
         {/* Visibility */}
         <section className="flex items-center justify-between rounded-2xl border border-border bg-card p-5" aria-labelledby="visibility-heading">
           <div>
@@ -507,10 +577,22 @@ export default function AdminDashboard() {
           />
         </section>
       </main>
+      <aside aria-label="Live preview" className="lg:sticky lg:top-20 lg:self-start">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Live preview</p>
+        <div className="rounded-3xl border border-border bg-background p-3 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+          <ContactCard
+            preview
+            avatarOverride={photoPreview ?? (avatarPath ? `/api/public/profile-photo/${avatarPath}?v=${avatarVersion}` : null)}
+            profile={{ ...form, avatar_path: avatarPath }}
+            links={links.filter((l) => l.url.trim()).map((l, i) => ({ platform: l.platform, url: l.url, position: i, id: l._key }))}
+          />
+        </div>
+      </aside>
+      </div>
 
       {/* Sticky save bar */}
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/95 p-4 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <p className="hidden text-xs text-muted-foreground sm:block">
             Changes go live on the public card after saving.
           </p>
