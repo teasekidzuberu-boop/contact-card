@@ -5,9 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system — premium minimalist black.
- * Near-black background, charcoal surfaces, white type,
- * restrained muted-gold accents. All colors are oklch tokens.
+ * Design system — Emerald Prestige.
+ * Deep emerald background, cream type, gold accents. All colors are oklch tokens.
  */
 
 @theme inline {
@@ -41,33 +40,33 @@
   --color-gold-soft: var(--gold-soft);
   --color-success: var(--success);
 
-  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
   --radius: 1rem;
-  --background: oklch(0.145 0 0); /* #090909 */
-  --foreground: oklch(0.97 0 0);
-  --card: oklch(0.185 0 0); /* #151515 */
-  --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.17 0 0);
-  --popover-foreground: oklch(0.97 0 0);
-  --primary: oklch(0.74 0.08 84); /* #B99A61 muted gold */
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.23 0 0);
-  --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.22 0 0);
-  --muted-foreground: oklch(0.68 0.008 84);
-  --accent: oklch(0.74 0.08 84);
-  --accent-foreground: oklch(0.145 0 0);
-  --destructive: oklch(0.6 0.19 25);
-  --destructive-foreground: oklch(0.97 0 0);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.74 0.08 84 / 55%);
-  --gold-soft: oklch(0.74 0.08 84 / 12%);
-  --success: oklch(0.72 0.15 155);
+  --background: oklch(0.24 0.05 168); /* deep emerald #064e3b */
+  --foreground: oklch(0.96 0.02 90); /* cream #f5f0e0 */
+  --card: oklch(0.30 0.06 168);
+  --card-foreground: oklch(0.96 0.02 90);
+  --popover: oklch(0.28 0.06 168);
+  --popover-foreground: oklch(0.96 0.02 90);
+  --primary: oklch(0.75 0.11 85); /* gold #c9a84c */
+  --primary-foreground: oklch(0.22 0.05 168);
+  --secondary: oklch(0.36 0.07 168);
+  --secondary-foreground: oklch(0.96 0.02 90);
+  --muted: oklch(0.33 0.06 168);
+  --muted-foreground: oklch(0.80 0.03 120);
+  --accent: oklch(0.52 0.10 168); /* #0d7a5f */
+  --accent-foreground: oklch(0.96 0.02 90);
+  --destructive: oklch(0.62 0.19 25);
+  --destructive-foreground: oklch(0.96 0.02 90);
+  --border: oklch(0.96 0.02 90 / 12%);
+  --input: oklch(0.96 0.02 90 / 16%);
+  --ring: oklch(0.75 0.11 85 / 60%);
+  --gold-soft: oklch(0.75 0.11 85 / 14%);
+  --success: oklch(0.75 0.15 155);
 }
 
 @layer base {
