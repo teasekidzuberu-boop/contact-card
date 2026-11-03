@@ -14,6 +14,8 @@ export interface PublicProfile {
   website: string;
   avatar_path: string | null;
   published: boolean;
+  brand_color: string;
+  qr_url: string;
 }
 
 export interface SocialLink {

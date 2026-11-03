@@ -39,6 +39,7 @@
   --color-ring: var(--ring);
   --color-gold-soft: var(--gold-soft);
   --color-success: var(--success);
+  --shadow-card: var(--shadow-card);
 
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
@@ -46,27 +47,48 @@
 
 :root {
   --radius: 1rem;
-  --background: oklch(0.24 0.05 168); /* deep emerald #064e3b */
-  --foreground: oklch(0.96 0.02 90); /* cream #f5f0e0 */
-  --card: oklch(0.30 0.06 168);
-  --card-foreground: oklch(0.96 0.02 90);
-  --popover: oklch(0.28 0.06 168);
-  --popover-foreground: oklch(0.96 0.02 90);
-  --primary: oklch(0.75 0.11 85); /* gold #c9a84c */
-  --primary-foreground: oklch(0.22 0.05 168);
-  --secondary: oklch(0.36 0.07 168);
-  --secondary-foreground: oklch(0.96 0.02 90);
-  --muted: oklch(0.33 0.06 168);
-  --muted-foreground: oklch(0.80 0.03 120);
-  --accent: oklch(0.52 0.10 168); /* #0d7a5f */
-  --accent-foreground: oklch(0.96 0.02 90);
+  /* LuxeCard — emerald #061C17, forest #10392D, champagne #D7B56D, ivory #F5F1E7, sage */
+  --background: oklch(0.2 0.03 170);
+  --foreground: oklch(0.96 0.015 90);
+  --card: oklch(0.29 0.045 165);
+  --card-foreground: oklch(0.96 0.015 90);
+  --popover: oklch(0.27 0.045 165);
+  --popover-foreground: oklch(0.96 0.015 90);
+  --primary: #d7b56d;
+  --primary-foreground: oklch(0.2 0.03 170);
+  --secondary: oklch(0.34 0.045 165);
+  --secondary-foreground: oklch(0.96 0.015 90);
+  --muted: oklch(0.32 0.04 165);
+  --muted-foreground: oklch(0.78 0.03 150); /* muted sage */
+  --accent: oklch(0.38 0.05 165);
+  --accent-foreground: oklch(0.96 0.015 90);
   --destructive: oklch(0.62 0.19 25);
-  --destructive-foreground: oklch(0.96 0.02 90);
-  --border: oklch(0.96 0.02 90 / 12%);
-  --input: oklch(0.96 0.02 90 / 16%);
-  --ring: oklch(0.75 0.11 85 / 60%);
-  --gold-soft: oklch(0.75 0.11 85 / 14%);
+  --destructive-foreground: oklch(0.96 0.015 90);
+  --border: oklch(0.96 0.015 90 / 10%);
+  --input: oklch(0.96 0.015 90 / 16%);
+  --ring: color-mix(in oklab, var(--primary) 60%, transparent);
+  --gold-soft: color-mix(in oklab, var(--primary) 22%, transparent);
   --success: oklch(0.75 0.15 155);
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 4%) inset, 0 24px 48px -28px oklch(0 0 0 / 70%);
+}
+
+.light {
+  --background: oklch(0.96 0.015 90);
+  --foreground: oklch(0.22 0.035 168);
+  --card: oklch(0.99 0.008 90);
+  --card-foreground: oklch(0.22 0.035 168);
+  --popover: oklch(0.99 0.008 90);
+  --popover-foreground: oklch(0.22 0.035 168);
+  --primary-foreground: oklch(0.2 0.03 170);
+  --secondary: oklch(0.92 0.02 120);
+  --secondary-foreground: oklch(0.22 0.035 168);
+  --muted: oklch(0.93 0.015 120);
+  --muted-foreground: oklch(0.45 0.035 160);
+  --accent: oklch(0.9 0.025 140);
+  --accent-foreground: oklch(0.22 0.035 168);
+  --border: oklch(0.22 0.035 168 / 12%);
+  --input: oklch(0.22 0.035 168 / 18%);
+  --shadow-card: 0 20px 40px -28px oklch(0.22 0.035 168 / 35%);
 }
 
 @layer base {

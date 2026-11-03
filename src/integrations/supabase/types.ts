@@ -19,6 +19,7 @@ export type Database = {
           avatar_path: string | null
           avatar_url: string | null
           bio: string
+          brand_color: string
           created_at: string
           email: string
           full_name: string
@@ -27,6 +28,7 @@ export type Database = {
           organization: string
           phone: string
           published: boolean
+          qr_url: string
           slug: string
           title: string
           updated_at: string
@@ -38,6 +40,7 @@ export type Database = {
           avatar_path?: string | null
           avatar_url?: string | null
           bio?: string
+          brand_color?: string
           created_at?: string
           email?: string
           full_name?: string
@@ -46,6 +49,7 @@ export type Database = {
           organization?: string
           phone?: string
           published?: boolean
+          qr_url?: string
           slug: string
           title?: string
           updated_at?: string
@@ -57,6 +61,7 @@ export type Database = {
           avatar_path?: string | null
           avatar_url?: string | null
           bio?: string
+          brand_color?: string
           created_at?: string
           email?: string
           full_name?: string
@@ -65,6 +70,7 @@ export type Database = {
           organization?: string
           phone?: string
           published?: boolean
+          qr_url?: string
           slug?: string
           title?: string
           updated_at?: string

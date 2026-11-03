@@ -41,6 +41,8 @@ function toProfile(row: Database["public"]["Tables"]["card_profile"]["Row"]): Pu
     website: row.website,
     avatar_path: row.avatar_path,
     published: row.published,
+    brand_color: row.brand_color,
+    qr_url: row.qr_url,
   };
 }
 

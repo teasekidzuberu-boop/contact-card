@@ -1,270 +1,303 @@
-import { useState } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useHydrated } from "@tanstack/react-router";
+import { QRCodeCanvas } from "qrcode.react";
 import { toast } from "sonner";
 import {
+  ClipboardCopy,
   Copy,
   Download,
+  Globe,
+  Loader2,
   Mail,
   MapPin,
   MessageCircle,
   MessageSquare,
   Phone,
+  QrCode,
   Share2,
   UserRound,
-  Globe,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import ThemeToggle from "@/components/ThemeToggle";
 import { buildVCard, vCardFileName } from "@/lib/vcard";
-import { buildWhatsAppUrl } from "@/lib/phone";
+import { buildWhatsAppUrl, normalizePhone } from "@/lib/phone";
 import { isValidExternalUrl, platformIcon, platformAriaLabel } from "@/lib/social";
+import { contactDetailsText, qrTarget, safeBrandColor } from "@/lib/brand";
 import type { PublicProfile, SocialLink } from "@/lib/types";
 
 interface ContactCardProps {
   profile: PublicProfile;
   links: SocialLink[];
+  /** Render inside the admin preview: no page chrome, no theme toggle. */
+  preview?: boolean;
+  /** Local avatar preview URL (admin). */
+  avatarOverride?: string | null;
 }
 
-function downloadVCard(profile: PublicProfile, links: SocialLink[]) {
-  const vcf = buildVCard(profile, links);
-  const blob = new Blob([vcf], { type: "text/vcard;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
+function downloadUrl(url: string, filename: string) {
   const a = document.createElement("a");
   a.href = url;
-  a.download = vCardFileName(profile.slug);
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
 }
 
-export default function ContactCard({ profile, links }: ContactCardProps) {
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand("copy");
+    el.remove();
+    return ok;
+  }
+}
+
+function SectionTitle({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      {children}
+    </h2>
+  );
+}
+
+const rowClass =
+  "flex min-h-12 items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-secondary active:bg-accent focus-visible:outline-2 focus-visible:outline-ring";
+
+function Row({ icon, label, value, href, external }: { icon: ReactNode; label: string; value: string; href?: string; external?: boolean }) {
+  const inner = (
+    <>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gold-soft text-primary">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="block truncate">{value}</span>
+      </span>
+    </>
+  );
+  return (
+    <li>
+      {href ? (
+        <a href={href} className={rowClass} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+          {inner}
+        </a>
+      ) : (
+        <div className={rowClass}>{inner}</div>
+      )}
+    </li>
+  );
+}
+
+export default function ContactCard({ profile, links, preview, avatarOverride }: ContactCardProps) {
   const hydrated = useHydrated();
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const qrRef = useRef<HTMLDivElement>(null);
 
-  const canonicalUrl = hydrated ? `${window.location.origin}/p/${profile.slug}` : "";
+  const cardUrl = hydrated ? `${window.location.origin}/p/${profile.slug}` : "";
+  const qrValue = qrTarget(profile.qr_url, cardUrl);
+  const brand = safeBrandColor(profile.brand_color);
+  const brandStyle = {
+    "--primary": brand,
+    "--ring": `color-mix(in oklab, ${brand} 60%, transparent)`,
+    "--gold-soft": `color-mix(in oklab, ${brand} 18%, transparent)`,
+  } as CSSProperties;
 
-  const initials = profile.full_name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-
-  const whatsappUrl =
-    buildWhatsAppUrl(profile.whatsapp_number ?? "", profile.whatsapp_message) ?? undefined;
-  const smsHref = profile.phone?.trim() ? `sms:${profile.phone.replace(/[^\d+]/g, "")}` : null;
+  const phoneDigits = normalizePhone(profile.phone);
+  const telHref = phoneDigits ? `tel:${profile.phone.trim().startsWith("+") ? "+" : ""}${phoneDigits}` : null;
+  const smsHref = phoneDigits ? `sms:${profile.phone.trim().startsWith("+") ? "+" : ""}${phoneDigits}` : null;
+  const whatsappUrl = buildWhatsAppUrl(profile.whatsapp_number, profile.whatsapp_message);
+  const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email.trim()) ? profile.email.trim() : null;
   const websiteUrl = isValidExternalUrl(profile.website) ? profile.website.trim() : null;
   const safeLinks = links.filter((l) => isValidExternalUrl(l.url));
+  const avatarSrc = avatarOverride ?? (profile.avatar_path ? `/api/public/profile-photo/${profile.avatar_path}` : null);
 
   const handleSave = () => {
+    setSaving(true);
     try {
-      downloadVCard(profile, links);
-      setSaved(true);
-      toast.success("Contact file downloaded");
-      window.setTimeout(() => setSaved(false), 2500);
+      const blob = new Blob([buildVCard(profile, safeLinks)], { type: "text/vcard;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      downloadUrl(url, vCardFileName(profile.slug));
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      toast.success("Contact saved", { description: "Open the file to add it to your contacts." });
     } catch {
       toast.error("Could not generate the contact file");
+    } finally {
+      setTimeout(() => setSaving(false), 600);
     }
   };
 
-  const handleCopy = async () => {
-    if (!canonicalUrl) return;
-    try {
-      await navigator.clipboard.writeText(canonicalUrl);
-      toast.success("Profile link copied");
-    } catch {
-      // Clipboard API can be unavailable (http or permissions); fall back.
-      const el = document.createElement("textarea");
-      el.value = canonicalUrl;
-      el.style.position = "fixed";
-      el.style.opacity = "0";
-      document.body.appendChild(el);
-      el.select();
-      const ok = document.execCommand("copy");
-      el.remove();
-      if (ok) toast.success("Profile link copied");
-      else toast.error("Could not copy the link", { description: canonicalUrl });
-    }
+  const handleCopyLink = async () => {
+    if (!cardUrl) return;
+    if (await copyText(cardUrl)) toast.success("Profile link copied");
+    else toast.error("Could not copy the link", { description: cardUrl });
+  };
+
+  const handleCopyDetails = async () => {
+    if (await copyText(contactDetailsText(profile, cardUrl))) toast.success("Contact details copied");
+    else toast.error("Could not copy details");
   };
 
   const handleShare = async () => {
-    if (typeof navigator !== "undefined" && "share" in navigator) {
+    if ("share" in navigator) {
       try {
-        await navigator.share({ title: profile.full_name, url: canonicalUrl });
+        await navigator.share({ title: profile.full_name, text: profile.title, url: cardUrl });
         return;
       } catch (err) {
         if ((err as DOMException)?.name === "AbortError") return;
       }
     }
-    void handleCopy();
+    void handleCopyLink();
   };
 
+  const handleQrDownload = () => {
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    downloadUrl(canvas.toDataURL("image/png"), `${profile.slug || "card"}-qr.png`);
+    toast.success("QR code downloaded");
+  };
 
-  return (
-    <div className="fade-in flex min-h-screen justify-center bg-background px-4 py-10 sm:py-16">
-      <main className="rise w-full max-w-sm">
-        <article className="rounded-3xl border border-border bg-card px-6 pb-8 pt-10 text-center shadow-[0_24px_60px_-30px_rgba(0,0,0,0.8)] sm:px-8">
-          {/* Avatar */}
-          <div className="mx-auto size-28 overflow-hidden rounded-full border border-gold-soft p-1">
-            {profile.avatar_path ? (
-              <img
-                src={`/api/public/profile-photo/${profile.avatar_path}`}
-                alt={`${profile.full_name}'s profile photo`}
-                className="size-full rounded-full object-cover"
-                width={112}
-                height={112}
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center rounded-full bg-secondary">
-                <UserRound className="size-10 text-muted-foreground" aria-hidden />
-              </div>
-            )}
-          </div>
+  const hasDetails = telHref || email || profile.location.trim() || websiteUrl || whatsappUrl;
+  const subtitle = [profile.title, profile.organization].filter(Boolean).join(" · ");
 
-          <h1 className="mt-5 font-display text-4xl leading-tight text-foreground">
-            {profile.full_name || "Unnamed"}
-          </h1>
-          {(profile.title || profile.organization) && (
-            <p className="mt-1 text-sm font-medium tracking-wide text-primary">
-              {[profile.title, profile.organization].filter(Boolean).join(" · ")}
-            </p>
+  const body = (
+    <div className="space-y-4">
+      {/* Hero */}
+      <section className="rounded-3xl border border-border bg-card px-5 pb-6 pt-7 text-center shadow-card" aria-label="Profile">
+        <div className="mx-auto size-24 rounded-full p-[3px] ring-1 ring-primary/60">
+          {avatarSrc ? (
+            <img src={avatarSrc} alt={`${profile.full_name || "Profile"} photo`} className="size-full rounded-full object-cover" width={96} height={96} />
+          ) : (
+            <div className="flex size-full items-center justify-center rounded-full bg-secondary">
+              <UserRound className="size-9 text-muted-foreground" aria-hidden />
+            </div>
           )}
-          {profile.bio.trim() && (
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{profile.bio}</p>
-          )}
+        </div>
+        <h1 className="mt-4 break-words font-display text-2xl font-semibold leading-tight text-foreground">
+          {profile.full_name || "Your name"}
+        </h1>
+        {subtitle && <p className="mt-1 text-sm font-medium text-primary">{subtitle}</p>}
+        {profile.location.trim() && (
+          <p className="mt-1.5 flex items-center justify-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="size-3.5" aria-hidden /> {profile.location}
+          </p>
+        )}
+        {profile.bio.trim() && (
+          <p className="mx-auto mt-3 max-w-xs whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{profile.bio}</p>
+        )}
 
-          <div className="mx-auto mt-6 h-px w-16 bg-gold-soft" aria-hidden />
-
-          {/* Primary actions */}
-          <div className="mt-6 flex flex-col gap-3">
-            <Button
-              size="lg"
-              onClick={handleSave}
-              className="h-12 w-full rounded-full text-base font-semibold"
-              aria-label="Save contact as a vCard file"
-            >
-              <Download aria-hidden />
-              {saved ? "Saved!" : "Save Contact"}
-            </Button>
-            {whatsappUrl && (
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="h-12 w-full rounded-full text-base font-semibold"
-              >
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Chat on WhatsApp (opens in a new tab)"
-                >
-                  <MessageCircle aria-hidden />
-                  WhatsApp
-                </a>
-              </Button>
-            )}
-            {smsHref && (
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="h-12 w-full rounded-full text-base font-semibold"
-              >
-                <a href={smsHref} aria-label={`Send a text message to ${profile.phone}`}>
-                  <MessageSquare aria-hidden />
-                  Text message
-                </a>
-              </Button>
-            )}
-          </div>
-
-          {/* Contact details */}
-          {(profile.email.trim() || profile.phone.trim() || profile.location.trim() || websiteUrl) && (
-            <ul className="mt-7 space-y-2 text-left">
-              {profile.email.trim() && (
-                <li>
-                  <a
-                    href={`mailto:${profile.email.trim()}`}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground/90 transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <Mail className="size-4 shrink-0 text-primary" aria-hidden />
-                    <span className="truncate">{profile.email}</span>
-                  </a>
-                </li>
-              )}
-              {profile.phone.trim() && (
-                <li>
-                  <a
-                    href={`tel:${profile.phone.replace(/[^\d+]/g, "")}`}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground/90 transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <Phone className="size-4 shrink-0 text-primary" aria-hidden />
-                    <span>{profile.phone}</span>
-                  </a>
-                </li>
-              )}
-              {profile.location.trim() && (
-                <li className="flex items-center gap-3 px-2 py-2 text-sm text-foreground/90">
-                  <MapPin className="size-4 shrink-0 text-primary" aria-hidden />
-                  <span>{profile.location}</span>
-                </li>
-              )}
-              {websiteUrl && (
-                <li>
-                  <a
-                    href={websiteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground/90 transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <Globe className="size-4 shrink-0 text-primary" aria-hidden />
-                    <span className="truncate">{websiteUrl.replace(/^https?:\/\//, "")}</span>
-                  </a>
-                </li>
-              )}
-            </ul>
-          )}
-
-          {/* Social links */}
-          {safeLinks.length > 0 && (
-            <nav aria-label="Social profiles" className="mt-6 flex justify-center gap-2">
-              {safeLinks.map((link) => {
-                const Icon = platformIcon(link.platform);
+        {/* Primary actions */}
+        <div className="mt-5 space-y-2.5">
+          <Button size="lg" onClick={handleSave} disabled={saving} className="h-12 w-full rounded-full text-base font-semibold transition-transform active:scale-[0.98]">
+            {saving ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />}
+            Save Contact
+          </Button>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              whatsappUrl && { href: whatsappUrl, label: "WhatsApp", icon: <MessageCircle aria-hidden />, ext: true },
+              telHref && { href: telHref, label: "Call", icon: <Phone aria-hidden /> },
+              smsHref && { href: smsHref, label: "Text", icon: <MessageSquare aria-hidden /> },
+            ]
+              .filter(Boolean)
+              .map((a) => {
+                const act = a as { href: string; label: string; icon: ReactNode; ext?: boolean };
                 return (
                   <a
-                    key={link.id ?? `${link.platform}-${link.url}`}
-                    href={link.url.trim()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={platformAriaLabel(link.platform, link.url)}
-                    className="flex size-10 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+                    key={act.label}
+                    href={act.href}
+                    {...(act.ext ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    className="flex h-14 flex-col items-center justify-center gap-1 rounded-2xl border border-border bg-secondary/60 text-xs font-medium text-foreground transition-all hover:border-primary/60 active:scale-95 focus-visible:outline-2 focus-visible:outline-ring [&_svg]:size-4 [&_svg]:text-primary"
                   >
-                    <Icon className="size-4" aria-hidden />
+                    {act.icon}
+                    {act.label}
                   </a>
                 );
               })}
-            </nav>
-          )}
-
-          {/* Share actions */}
-          <div className="mt-6 flex justify-center gap-3">
-            <Button variant="ghost" size="sm" onClick={handleCopy} className="text-muted-foreground">
-              <Copy aria-hidden />
-              Copy link
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleShare} className="text-muted-foreground">
-              <Share2 aria-hidden />
-              Share
-            </Button>
           </div>
-        </article>
+        </div>
+      </section>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground/70">
-          Digital contact card · <a href="/admin/login" className="hover:text-primary">Admin</a>
-        </p>
-      </main>
+      {hasDetails && (
+        <section className="rounded-3xl border border-border bg-card p-3 shadow-card">
+          <SectionTitle>Contact</SectionTitle>
+          <ul className="space-y-0.5">
+            {telHref && <Row icon={<Phone className="size-4" />} label="Phone" value={profile.phone} href={telHref} />}
+            {whatsappUrl && <Row icon={<MessageCircle className="size-4" />} label="WhatsApp" value={profile.whatsapp_number} href={whatsappUrl} external />}
+            {email && <Row icon={<Mail className="size-4" />} label="Email" value={email} href={`mailto:${email}`} />}
+            {websiteUrl && <Row icon={<Globe className="size-4" />} label="Website" value={websiteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")} href={websiteUrl} external />}
+            {profile.location.trim() && <Row icon={<MapPin className="size-4" />} label="Location" value={profile.location} />}
+          </ul>
+        </section>
+      )}
+
+      {safeLinks.length > 0 && (
+        <section className="rounded-3xl border border-border bg-card p-3 shadow-card">
+          <SectionTitle>Social</SectionTitle>
+          <nav aria-label="Social profiles" className="flex flex-wrap gap-2 px-1 pb-1">
+            {safeLinks.map((link) => {
+              const Icon = platformIcon(link.platform);
+              return (
+                <a
+                  key={link.id ?? `${link.platform}-${link.url}`}
+                  href={link.url.trim()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={platformAriaLabel(link.platform, link.url)}
+                  className="flex h-11 items-center gap-2 rounded-full border border-border px-4 text-sm text-foreground transition-all hover:border-primary hover:text-primary active:scale-95 focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <Icon className="size-4 text-primary" aria-hidden />
+                  {link.platform}
+                </a>
+              );
+            })}
+          </nav>
+        </section>
+      )}
+
+      <section className="rounded-3xl border border-border bg-card p-4 shadow-card">
+        <SectionTitle>Scan &amp; share</SectionTitle>
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+          <div ref={qrRef} className="shrink-0 rounded-2xl bg-white p-2.5" aria-label="QR code for this contact card" role="img">
+            {qrValue ? (
+              <QRCodeCanvas value={qrValue} size={132} level="M" marginSize={0} fgColor="#061C17" bgColor="#ffffff" />
+            ) : (
+              <div className="flex size-[132px] items-center justify-center"><QrCode className="size-8 text-muted-foreground" aria-hidden /></div>
+            )}
+          </div>
+          <div className="grid w-full grid-cols-2 gap-2">
+            <Button variant="outline" onClick={handleShare} className="h-11 rounded-full"><Share2 aria-hidden /> Share</Button>
+            <Button variant="outline" onClick={handleCopyLink} className="h-11 rounded-full"><Copy aria-hidden /> Copy link</Button>
+            <Button variant="outline" onClick={handleCopyDetails} className="h-11 rounded-full"><ClipboardCopy aria-hidden /> Details</Button>
+            <Button variant="outline" onClick={handleQrDownload} disabled={!qrValue} className="h-11 rounded-full"><Download aria-hidden /> QR</Button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+
+  if (preview) return <div style={brandStyle}>{body}</div>;
+
+  return (
+    <div style={brandStyle} className="fade-in min-h-screen overflow-x-hidden bg-background px-4 pb-8 pt-4">
+      <div className="rise mx-auto w-full max-w-md">
+        <header className="mb-4 flex items-center justify-between">
+          <span className="font-display text-lg font-semibold tracking-tight text-foreground">
+            Luxe<span className="text-primary">Card</span>
+          </span>
+          <ThemeToggle />
+        </header>
+        <main>{body}</main>
+        <footer className="mt-6 text-center text-xs text-muted-foreground">
+          © {new Date().getFullYear()} {profile.full_name} · LuxeCard ·{" "}
+          <a href="/admin/login" className="underline-offset-2 hover:text-primary hover:underline">Admin</a>
+        </footer>
+      </div>
     </div>
   );
 }
