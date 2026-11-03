@@ -94,11 +94,21 @@ export default function AdminDashboard() {
         setLoading(false);
         return;
       }
-      const row = rows?.[0];
+      let row = rows?.[0];
       if (!row) {
-        setLoadError("No profile exists yet. Run the database setup first.");
-        setLoading(false);
-        return;
+        // First visit after setup: create an empty, unpublished starter card.
+        const { data: created, error: createError } = await supabase
+          .from("card_profile")
+          .insert({ slug: "my-card", published: false })
+          .select("*")
+          .single();
+        if (cancelled) return;
+        if (createError || !created) {
+          setLoadError(createError?.message ?? "Could not create your card.");
+          setLoading(false);
+          return;
+        }
+        row = created;
       }
       setProfileId(row.id);
       setForm({
