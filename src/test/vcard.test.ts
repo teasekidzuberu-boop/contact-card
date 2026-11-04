@@ -19,6 +19,8 @@ const demoProfile: PublicProfile = {
   website: "https://example.com",
   avatar_path: null,
   published: true,
+  brand_color: "#D7B56D",
+  qr_url: "",
 };
 
 describe("escapeVCardValue", () => {
